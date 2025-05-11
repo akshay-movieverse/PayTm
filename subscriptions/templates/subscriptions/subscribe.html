@@ -1,0 +1,77 @@
+{% extends 'base.html' %} {% comment %} Or your base template {% endcomment %}
+
+{% block content %}
+<h2>Subscribe to Our Plan</h2>
+<p>Click the button below to subscribe using PayPal.</p>
+
+<div id="paypal-button-container"></div>
+{% comment %} data-sdk-integration-source="button-factory" {% endcomment %}
+<script src="https://www.paypal.com/sdk/js?client-id={{ paypal_client_id }}&components=buttons&vault=true&intent=subscription&currency=USD" ></script>
+
+<script>
+    const planId = '{{ paypal_plan_id }}'; // Get Plan ID from Django context
+    const saveSubscriptionUrl = '{% url "save_subscription" %}'; // URL to send successful subscription ID to Django
+    const csrfToken = '{{ csrf_token }}'; // Django CSRF token
+
+    paypal.Buttons({
+        style: {
+            shape: 'rect',
+            color: 'gold',
+            layout: 'vertical',
+            label: 'subscribe'
+        },
+        createSubscription: function(data, actions) {
+            // This function is called when the button is clicked
+            console.log("Creating subscription for plan:", planId);
+            return actions.subscription.create({
+                /* Creates the subscription */
+                plan_id: planId
+            });
+        },
+        onApprove: function(data, actions) {
+            // This function is called after the user approves the subscription on PayPal
+            console.log("Subscription approved:", data);
+            alert('Subscription Approved! Subscription ID: ' + data.subscriptionID + '. Saving to server...'); // Optional alert
+
+            // Send the subscription ID to your Django backend to save/activate
+            fetch(saveSubscriptionUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrfToken // Include CSRF token
+                },
+                body: JSON.stringify({
+                    subscriptionID: data.subscriptionID,
+                    planID: planId // Send plan ID too if needed
+                })
+            })
+            .then(response => response.json())
+            .then(result => {
+                console.log('Server response:', result);
+                if (result.success) {
+                    // Redirect to a success page or update UI
+                    alert('Subscription saved successfully!');
+                    window.location.href = '{% url "subscription_success" %}'; // Example success page URL
+                } else {
+                    // Handle server-side error (e.g., failed to save)
+                    alert('Error saving subscription: ' + (result.error || 'Unknown error'));
+                }
+            })
+            .catch(error => {
+                console.error('Error sending subscription ID to server:', error);
+                alert('An error occurred while saving your subscription. Please contact support.');
+            });
+        },
+        onError: function (err) {
+            // Handle errors during the PayPal checkout flow
+            console.error('PayPal Button Error:', err);
+            alert('An error occurred with the PayPal button. Please try again or contact support.');
+        },
+        onCancel: function (data) {
+            // Handle the case where the user cancels the flow in the PayPal popup
+            console.log('Subscription cancelled by user:', data);
+            alert('Subscription process cancelled.');
+        }
+    }).render('#paypal-button-container'); // Renders the PayPal button
+</script>
+{% endblock %}

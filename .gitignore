@@ -1,0 +1,5 @@
+sunday/
+.env
+vegeta/
+__pycache__/
+staticfiles/

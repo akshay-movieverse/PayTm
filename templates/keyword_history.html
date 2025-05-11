@@ -1,0 +1,120 @@
+{% load static %}
+
+{% load socialaccount %} 
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AutoPoster Dashboard</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{% static 'vendor/bootstrap/css/bootstrap.min.css' %}">
+    <link rel="stylesheet" href="{% static 'vendor/font-awesome/css/all.min.css' %}">
+    <link rel="stylesheet" href="{% static 'css/dashboard/style.css' %}">
+    {% csrf_token %}
+</head>
+<body>
+    <nav class="navbar navbar-light bg-white border-bottom">
+        <div class="container-fluid">
+            <button class="mobile-menu-toggle">
+                <i class="fas fa-bars"></i>
+            </button>
+            <span class="navbar-brand">AutoPoster</span>
+            <a href="{% url 'logout' %}">
+                <span class="navbar-text fw-bold">{{request.user.first_name}}</span>
+            </a>
+        </div>
+    </nav>
+
+    <div class="main-container">
+        <div class="sidebar">
+            <div class="sidebar-content">
+                <ul class="nav flex-column pt-3">
+                    <li class="nav-item">
+                        <a class="nav-link active" href="/">Dashboard</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#">Creators</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/history">History</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/keywords">Keywords</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#">Tone</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#">Manual Tone</a>
+                    </li>
+                </ul>
+            </div>
+            <div class="sidebar-footer">
+                <button class="help-support">
+                    <span class="whatsapp-icon">
+                        <i class="fab fa-whatsapp"></i>
+                    </span>
+                    <span class="help-text">Help & Support</span>
+                </button>
+            </div>
+        </div>
+
+        <div class="content-area">
+            <h2>AI Comment History</h2>
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th scope="col">#</th>
+                        <th scope="col">Keyword</th>
+                        <th scope="col">Comment</th>
+                        <th scope="col">Post</th>
+                        <th scope="col">Created At</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for comment in comments %}
+                    <tr>
+                        <th scope="row">{{ forloop.counter }}</th>
+                        <td>
+                            {% comment %} <div class="d-flex align-items-center">
+                                <img src="{{ comment.post.linkedin_follow_profile.profile_image_url }}" alt="{{ comment.post.linkedin_follow_profile.name }}" class="rounded-circle me-2" style="width: 50px; height: 50px; object-fit: cover;">
+                                <span>{{ comment.post.linkedin_follow_profile.name }}</span>
+                            </div> {% endcomment %}
+                            <div class="text-wrap">
+                                {{comment.keyword_post.keyword_linkedin.linkedin_keyword }}
+                            </div>
+                        </td>
+                        <td><div class="text-wrap">
+                            {{ comment.content }}
+                            </div>
+                        </td>
+                        <td>
+                            <a href="{{ comment.permalink }}" target="_blank" class="text-decoration-none text-body">
+                                <div class="text-wrap">
+                                    {{ comment.keyword_post.content }}
+                                </div>
+                            </a>
+                        </td>
+                        <td>{{ comment.comment_time|date:"M d, Y h:i A" }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="5" class="text-center">No comments found.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="sidebar-overlay"></div>
+
+   <script src="{% static 'vendor/bootstrap/js/bootstrap.bundle.min.js' %}"></script>
+   <script src="{% static 'js/dashboard/dashboard.js' %}"></script>
+
+   <!-- Link to the external JavaScript file -->
+{% comment %} <script src="{% static 'js/dashboard/linkedinProfiles.js' %}"></script> {% endcomment %}
+</body>
+</html>
