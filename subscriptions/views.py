@@ -42,7 +42,7 @@ def subscribe_view(request):
         'paypal_client_id': settings.PAYPAL_CLIENT_ID,
         'paypal_plan_id': settings.PAYPAL_PLAN_ID,
     }
-    return render(request, 'subscriptions/subscribe.html', context)
+    return render(request, 'subscriptions/multisubs.html', context)
 
 @login_required
 @require_POST
@@ -119,8 +119,63 @@ def subscription_success_view(request):
 @require_GET
 def subscription_cancel_view(request):
     """Page shown if the user cancels the PayPal flow."""
-    return render(request, 'subscriptions/subscription_cancel.html')
+    #return render(request, 'subscriptions/subscription_cancel.html')
 
+    sub = Subscription.objects.filter(user=request.user, status='ACTIVE').first()
+    if sub:
+        sub.status = 'CANCELLED'
+        sub.save()
+    return JsonResponse({"success": True})
+
+@csrf_exempt
+@login_required
+def update_subscription_plan(request):
+    import os
+    import requests
+    data = json.loads(request.body)
+    subscription_id = data.get("subscription_id")
+    new_plan_id = data.get("new_plan_id")
+
+    client_id = os.environ['PAYPAL_CLIENT_ID']
+    client_secret = os.environ['PAYPAL_CLIENT_SECRET']
+
+    auth_response = requests.post(
+        'https://api-m.sandbox.paypal.com/v1/oauth2/token',
+        auth=(client_id, client_secret),
+        headers={'Accept': 'application/json'},
+        data={'grant_type': 'client_credentials'}
+    )
+    if auth_response.status_code != 200:
+        return JsonResponse({"success": False, "error": "PayPal Auth Failed"})
+
+    access_token = auth_response.json()['access_token']
+
+    patch_data = [{
+        "op": "replace",
+        "path": "/plan_id",
+        "value": new_plan_id
+    }]
+
+    patch_response = requests.patch(
+        f"https://api-m.sandbox.paypal.com/v1/billing/subscriptions/{subscription_id}",
+        headers={
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {access_token}"
+        },
+        json=patch_data
+    )
+
+    if patch_response.status_code == 204:
+        # Update local DB
+        Subscription.objects.filter(paypal_subscription_id=subscription_id).update(
+            paypal_plan_id=new_plan_id
+        )
+        return JsonResponse({"success": True})
+    else:
+        return JsonResponse({
+            "success": False,
+            "error": patch_response.json().get("message", "Unknown error")
+        })
 
 # --- Webhook Handler ---
 

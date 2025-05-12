@@ -1,0 +1,175 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="subscription-wrapper">
+    <h2>Welcome back, {{ user.first_name }}</h2>
+
+    {% if active_subscription %}
+    <div class="active-plan-card">
+        <p><strong>Active Plan:</strong> {{ active_subscription.get_status_display }}</p>
+        <p><strong>Next Billing Date:</strong> {{ active_subscription.next_billing_date }}</p>
+        <p><strong>PayPal Plan ID:</strong> {{ active_subscription.paypal_plan_id }}</p>
+        <button id="paypal-cancel-btn" data-subscription-id="{{ active_subscription.paypal_subscription_id }}">Cancel via PayPal</button>
+    </div>
+    {% else %}
+    <p>No active subscription.</p>
+    {% endif %}
+
+    <h3>Pricing Plan</h3>
+    <div class="pricing-cards">
+        <div class="plan-card" id="basic-card">
+            <h4>$5/month</h4>
+            <p>Basic Plan</p>
+            <p>100 Credits/mo</p>
+            <button class="select-plan-btn" data-plan-id="{{ basic_plan_id }}">Choose Basic</button>
+        </div>
+
+        <div class="plan-card" id="pro-card">
+            <h4>$10/month</h4>
+            <p>Pro Plan</p>
+            <p>500 Credits/mo</p>
+            <button class="select-plan-btn" data-plan-id="{{ pro_plan_id }}">Choose Pro</button>
+        </div>
+
+        <div class="plan-card" id="unlimited-card">
+            <h4>$25/month</h4>
+            <p>Unlimited Plan</p>
+            <p>Unlimited Credits</p>
+            <button class="select-plan-btn" data-plan-id="{{ unlimited_plan_id }}">Choose Unlimited</button>
+        </div>
+    </div>
+
+    <div id="paypal-button-container" style="margin-top: 20px;"></div>
+</div>
+
+<script src="https://www.sandbox.paypal.com/sdk/js?client-id={{ paypal_client_id }}&components=buttons&vault=true&intent=subscription&currency=USD"></script>
+<script>
+    let selectedPlanId = null;
+    const saveUrl = '{% url "save_subscription" %}';
+    const updateUrl = '{% url "update_subscription_plan" %}';
+    const csrfToken = '{{ csrf_token }}';
+    const currentSubscriptionId = '{{ active_subscription.paypal_subscription_id|default:"" }}';
+    const currentPlanId = '{{ active_subscription.paypal_plan_id|default:"" }}';
+
+
+    document.querySelectorAll('.select-plan-btn').forEach(button => {
+        button.addEventListener('click', function () {
+            selectedPlanId = this.getAttribute('data-plan-id');
+
+            // If user already has a subscription, update it
+            if (currentSubscriptionId && selectedPlanId !== currentPlanId) {
+                if (!confirm("You're about to change your current plan. Continue?")) return;
+
+                fetch(updateUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': csrfToken
+                    },
+                    body: JSON.stringify({
+                        subscription_id: currentSubscriptionId,
+                        new_plan_id: selectedPlanId
+                    })
+                }).then(response => response.json())
+                  .then(result => {
+                      if (result.success) {
+                          alert("Plan changed successfully!");
+                          window.location.reload();
+                      } else {
+                          alert("Failed to change plan: " + result.error);
+                      }
+                  });
+                return;
+            }
+
+            // Else, render PayPal button for new subscription            
+            document.getElementById('paypal-button-container').innerHTML = '';
+            paypal.Buttons({
+                createSubscription: function (data, actions) {
+                    return actions.subscription.create({
+                        plan_id: selectedPlanId
+                    });
+                },
+                onApprove: function (data) {
+                    fetch(saveUrl, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRFToken': csrfToken
+                        },
+                        body: JSON.stringify({
+                            subscriptionID: data.subscriptionID,
+                            planID: selectedPlanId
+                        })
+                    }).then(response => response.json())
+                      .then(result => {
+                          if (result.success) {
+                              window.location.reload();
+                          } else {
+                              alert('Subscription failed: ' + result.error);
+                          }
+                      });
+                }
+            }).render('#paypal-button-container');
+        });
+    });
+
+    // Cancel subscription
+    document.getElementById("paypal-cancel-btn")?.addEventListener("click", function () {
+        const subscriptionId = this.getAttribute("data-subscription-id");
+
+        paypal.Subscription.cancel(subscriptionId).then(function () {
+            fetch("{% url 'subscription_cancel' %}", {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': csrfToken,
+                }
+            }).then(response => {
+                if (response.ok) {
+                    window.location.reload();
+                } else {
+                    alert("Failed to update subscription on server.");
+                }
+            });
+        }).catch(function (err) {
+            console.error("Cancellation failed:", err);
+            alert("PayPal cancellation failed.");
+        });
+    });
+</script>
+
+
+
+
+
+
+
+
+
+
+
+<script>
+    document.getElementById("paypal-cancel-btn")?.addEventListener("click", function () {
+        const subscriptionId = this.getAttribute("data-subscription-id");
+
+        paypal.Subscription.cancel(subscriptionId).then(function () {
+            // Optionally notify backend too
+            fetch("{% url 'subscription_cancel' %}", {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': '{{ csrf_token }}',
+                }
+            }).then(response => {
+                if (response.ok) {
+                    window.location.reload();
+                } else {
+                    alert("Failed to update subscription on server.");
+                }
+            });
+        }).catch(function (err) {
+            console.error("Cancellation failed:", err);
+            alert("PayPal cancellation failed.");
+        });
+    });
+</script>
+
+{% endblock %}
