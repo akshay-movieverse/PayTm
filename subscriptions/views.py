@@ -38,10 +38,25 @@ from .models import Subscription
 @require_GET
 def subscribe_view(request):
     """Displays the subscription page with the PayPal button."""
+    user = request.user
+
+    # Fetch or determine PayPal plan IDs (you can also hardcode if fixed)
+    #plan_ids = get_or_create_billing_plans()  # returns a dict like {'basic': '...', 'pro': '...', 'unlimited': '...'}
+    
+    # Check if user has an active subscription
+    active_subscription = Subscription.objects.filter(user=user, status='active').first()
+
     context = {
+        'active_subscription': active_subscription,
+        'basic_plan_id': settings.PAYPAL_PLAN_ID,#plan_ids['basic'],
+        'pro_plan_id': settings.PAYPAL_PLAN_ID,#plan_ids['pro'],
+        'unlimited_plan_id': settings.PAYPAL_PLAN_ID,#plan_ids['unlimited'],
         'paypal_client_id': settings.PAYPAL_CLIENT_ID,
-        'paypal_plan_id': settings.PAYPAL_PLAN_ID,
     }
+    # context = {
+    #     'paypal_client_id': settings.PAYPAL_CLIENT_ID,
+    #     'paypal_plan_id': settings.PAYPAL_PLAN_ID,
+    # }
     return render(request, 'subscriptions/multisubs.html', context)
 
 @login_required
@@ -96,11 +111,11 @@ def save_subscription_view(request):
         return JsonResponse({'success': True, 'subscription_id': subscription.id})
 
     except json.JSONDecodeError:
-        return JsonResponse({'error': 'Invalid JSON'}, status=400)
+        return JsonResponse({'success': False,'error': 'Invalid JSON'}, status=400)
     except Exception as e:
         print(f"Error saving subscription: {e}")
         # Log the error details here
-        return JsonResponse({'error': 'An internal server error occurred.'}, status=500)
+        return JsonResponse({'success': False,'error': 'An internal server error occurred.'}, status=500)
 
 
 @login_required
@@ -126,6 +141,7 @@ def subscription_cancel_view(request):
         sub.status = 'CANCELLED'
         sub.save()
     return JsonResponse({"success": True})
+
 
 @csrf_exempt
 @login_required
@@ -176,6 +192,7 @@ def update_subscription_plan(request):
             "success": False,
             "error": patch_response.json().get("message", "Unknown error")
         })
+
 
 # --- Webhook Handler ---
 
