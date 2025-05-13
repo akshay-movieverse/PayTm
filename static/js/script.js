@@ -69,6 +69,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
 
             console.log(`${currentSubscriptionId} You're about to change your current plan. Continue?",${selectedPlanId}, ${currentPlanId}`);
+            selectedPlanId = this.getAttribute('data-plan-id');
+            
             // If user already has a subscription, update it
             if (currentSubscriptionId  && selectedPlanId !== currentPlanId) {
                 if (!confirm("You're about to change your current plan. Continue?")) return;
