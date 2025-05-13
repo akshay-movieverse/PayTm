@@ -205,3 +205,7 @@ ACCOUNT_SESSION_REMEMBER = True
 ACCOUNT_SIGNUP_REDIRECT_URL = '/'  # Redirect signup attempts
 ACCOUNT_LOGIN_ON_EMAIL_CONFIRMATION = False  # Disable login after email confirmation
 ACCOUNT_SIGNUP_REDIRECT_URL = '/accounts/google/login/'  # Redirect signup attempts
+
+
+
+SECURE_CROSS_ORIGIN_OPENER_POLICY='same-origin-allow-popups'
