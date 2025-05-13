@@ -272,12 +272,12 @@ def paypal_webhook_view(request):
 
     #logger.info("Webhook signature verified successfully.")
     print("Webhook signature verified successfully.")
-    
+
     # --- Step 2: Process the verified event ---
     # The event body is already parsed in webhook_event_json
     event_type = webhook_event_json.get("event_type")
     resource = webhook_event_json.get("resource", {})
-    logger.info(f"Processing event type: {event_type} for resource ID (if any): {resource.get('id') or resource.get('billing_agreement_id')}")
+    #logger.info(f"Processing event type: {event_type} for resource ID (if any): {resource.get('id') or resource.get('billing_agreement_id')}")
 
     # --- Step 3: Handle specific event types ---
     try:
@@ -285,9 +285,10 @@ def paypal_webhook_view(request):
             subscription_id = resource.get("id")
             if subscription_id:
                 Subscription.objects.filter(paypal_subscription_id=subscription_id).update(status="CANCELLED")
-                logger.info(f"Subscription {subscription_id} status updated to CANCELLED.")
+                #logger.info(f"Subscription {subscription_id} status updated to CANCELLED.")
             else:
-                logger.warning(f"Event {event_type} missing resource.id.")
+                pass
+                #logger.warning(f"Event {event_type} missing resource.id.")
 
         elif event_type == "BILLING.SUBSCRIPTION.ACTIVATED":
             subscription_id = resource.get("id")
