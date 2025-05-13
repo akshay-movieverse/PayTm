@@ -1,0 +1,135 @@
+
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}ViralSort{% endblock %}</title>
+    <link rel="stylesheet" href="{% static 'css/styles.css' %}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <div class="container">
+        <!-- Sidebar -->
+        <div class="sidebar">
+            <div class="logo-container">
+                <div class="logo">
+                    <span class="logo-icon">V</span>
+                    <span class="logo-text">ViralSort</span>
+                </div>
+            </div>
+            
+            <!-- Sidebar Navigation -->
+            <nav class="sidebar-nav">
+                <ul>
+                    <li class="active">
+                        <a href="#">
+                            <i class="fas fa-th-large"></i>
+                            <span>Dashboard</span>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="#">
+                            <i class="fas fa-sort"></i>
+                            <span>All Sortings</span>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="#">
+                            <i class="fas fa-plus-circle"></i>
+                            <span>Creating</span>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="#">
+                            <i class="fas fa-check-circle"></i>
+                            <span>Published</span>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="#">
+                            <i class="fas fa-users"></i>
+                            <span>Team</span>
+                        </a>
+                    </li>
+                </ul>
+            </nav>
+            
+            <!-- Pro Plan Info -->
+            <div class="pro-plan-info">
+                <div class="pro-plan-header">
+                    <i class="fas fa-crown"></i>
+                    <span>Pro Plan</span>
+                </div>
+                <div class="pro-plan-details">
+                    <div class="pro-plan-stat">
+                        <span class="stat-value">97/100</span>
+                        <span class="stat-label">Credits</span>
+                    </div>
+                    <div class="pro-plan-stat">
+                        <span class="stat-value">1/3</span>
+                        <span class="stat-label">Projects</span>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Bottom Navigation -->
+            <div class="bottom-nav">
+                <ul>
+                    <li>
+                        <a href="#">
+                            <i class="fas fa-cog"></i>
+                            <span>Settings</span>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="#">
+                            <i class="fas fa-question-circle"></i>
+                            <span>Help</span>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="#">
+                            <i class="fas fa-sign-out-alt"></i>
+                            <span>Log Out</span>
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+        
+        <!-- Main Content -->
+        <div class="main-content">
+            <!-- Header -->
+            <header class="main-header">
+                <div class="welcome-text">Welcome back, Olivia</div>
+                <div class="header-right">
+                    <div class="project-dropdown">
+                        <button>
+                            Olivia's project
+                            <i class="fas fa-chevron-down"></i>
+                        </button>
+                    </div>
+                    <div class="user-info">
+                        <div class="user-details">
+                            <span class="user-name">Olivia Wilson</span>
+                            <span class="user-plan">Pro Plan</span>
+                        </div>
+                        <div class="user-avatar">
+                            <img src="{% static 'img/profile.jpg' %}" alt="Olivia Wilson">
+                        </div>
+                    </div>
+                </div>
+            </header>
+            
+            <!-- Main Content Area -->
+            <div class="content-area">
+                {% block content %}{% endblock %}
+            </div>
+        </div>
+    </div>
+    
+    <script src="{% static 'js/script.js' %}"></script>
+</body>
+</html>

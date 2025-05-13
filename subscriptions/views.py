@@ -57,7 +57,7 @@ def subscribe_view(request):
     #     'paypal_client_id': settings.PAYPAL_CLIENT_ID,
     #     'paypal_plan_id': settings.PAYPAL_PLAN_ID,
     # }
-    return render(request, 'subscriptions/multisubs.html', context)
+    return render(request, 'subscriptions/dashboard.html', context)
 
 @login_required
 @require_POST

@@ -1,0 +1,125 @@
+{% extends 'subscriptions/base.html' %}
+
+{% block title %}ViralSort Dashboard{% endblock %}
+
+{% block content %}
+<!-- Active Plan section -->
+<div class="plan-section">
+    {% if active_subscription %}
+    <div class="active-plan-card">
+        <div class="active-plan-header">
+            <h2>Active Plan</h2>
+            <button id="paypal-cancel-btn" class="cancel-btn" data-subscription-id="{{ active_subscription.paypal_subscription_id }}">Cancel Subscription</button>
+        </div>
+        
+        <div class="active-plan-content">
+            <div class="plan-badge">
+                <span>Pro Plan</span>
+            </div>
+            
+            <div class="plan-details">
+                <div class="plan-detail">
+                    <span class="detail-label">Renew on</span>
+                    <span class="detail-value">May 4, 2025</span>
+                </div>
+                
+                <div class="plan-detail">
+                    <span class="detail-label">Price</span>
+                    <span class="detail-value">$10/mo</span>
+                </div>
+                
+                <div class="plan-detail">
+                    <span class="detail-label">Credits</span>
+                    <span class="detail-value">100/mo</span>
+                </div>
+            </div>
+            
+            <div class="plan-action">
+                <button class="change-plan-btn">Change Plan</button>
+            </div>
+        </div>
+    </div>
+    <div class="separator"></div>
+    {% endif %}
+
+    
+    
+    <!-- Pricing Plans Section -->
+    <div class="pricing-section">
+        <h2 class="pricing-header">Pricing Plan</h2>
+        
+        <div class="pricing-cards">
+            <!-- Basic Plan -->
+            <div class="pricing-card">
+                <div class="price">
+                    <span class="amount">$5</span>
+                    <span class="period">/month</span>
+                </div>
+                
+                <h3>Basic Plan</h3>
+                
+                <div class="plan-feature">
+                    <i class="fas fa-check-circle"></i>
+                    <span>50 Credits/mo</span>
+                </div>
+                
+
+
+                <button class="plan-btn choose-btn" data-plan-id="{{ basic_plan_id }}">Choose Plan</button>
+            </div>
+            
+            <!-- Pro Plan -->
+            <div class="pricing-card active">
+                <div class="price">
+                    <span class="amount">$10</span>
+                    <span class="period">/month</span>
+                </div>
+                
+                <h3>Pro Plan</h3>
+                
+                <div class="plan-feature">
+                    <i class="fas fa-check-circle"></i>
+                    <span>100 Credits/mo</span>
+                </div>
+                
+                <button class="plan-btn subscribed-btn" data-plan-id="{{ unlimited_plan_id }}">Subscribed</button>
+            </div>
+            
+            <!-- Unlimited Plan -->
+            <div class="pricing-card">
+                <div class="popular-badge">Most Popular</div>
+                
+                <div class="price">
+                    <span class="amount">$20</span>
+                    <span class="period">/month</span>
+                </div>
+                
+                <h3>Unlimited Plan</h3>
+                
+                <div class="plan-feature">
+                    <i class="fas fa-check-circle"></i>
+                    <span>Unlimited Credits/mo</span>
+                </div>
+                
+                <button class="plan-btn choose-btn"  data-plan-id="{{ unlimited_plan_id }}">Choose Plan</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="paypal-button-container" style="margin-top: 20px;"></div>
+</div>
+
+
+
+<script src="https://www.sandbox.paypal.com/sdk/js?client-id={{ paypal_client_id }}&components=buttons&vault=true&intent=subscription&currency=USD"></script>
+
+<script>
+    let selectedPlanId = null;
+    const saveUrl = '{% url "save_subscription" %}';
+    const updateUrl = '{% url "update_subscription_plan" %}';
+    const csrfToken = '{{ csrf_token }}';
+    const currentSubscriptionId = '{{ active_subscription.paypal_subscription_id|default:"" }}';
+    const currentPlanId = '{{ active_subscription.paypal_plan_id|default:"" }}';
+</script>
+
+{% endblock %}

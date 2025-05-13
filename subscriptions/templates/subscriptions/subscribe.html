@@ -6,7 +6,7 @@
 
 <div id="paypal-button-container"></div>
 {% comment %} data-sdk-integration-source="button-factory" {% endcomment %}
-<script src="https://www.paypal.com/sdk/js?client-id={{ paypal_client_id }}&components=buttons&vault=true&intent=subscription&currency=USD" ></script>
+<script src="https://www.sandbox.paypal.com/sdk/js?client-id={{ paypal_client_id }}&components=buttons&vault=true&intent=subscription&currency=USD" ></script>
 
 <script>
     const planId = '{{ paypal_plan_id }}'; // Get Plan ID from Django context
