@@ -208,7 +208,7 @@ def paypal_webhook_view(request):
         # Parse the event body into a JSON object for the verification payload
         webhook_event_json = json.loads(event_body_str)
     except json.JSONDecodeError:
-        #print("Webhook Error: Invalid JSON in request body.")
+        print("Webhook Error: Invalid JSON in request body.")
         return HttpResponseBadRequest("Invalid JSON payload.")
 
     # Collect necessary headers from the incoming webhook
@@ -223,13 +223,13 @@ def paypal_webhook_view(request):
     webhook_id_from_settings = settings.PAYPAL_WEBHOOK_ID
 
     if not all([transmission_id, transmission_time, cert_url, auth_algo, transmission_sig, webhook_id_from_settings]):
-        #print("Webhook Error: Missing required PayPal headers or webhook ID configuration.")
+        print("Webhook Error: Missing required PayPal headers or webhook ID configuration.")
         return HttpResponseBadRequest("Missing required PayPal headers or server configuration.")
 
     # --- Step 1: Verify the webhook signature using PayPal's REST API ---
     access_token = get_paypal_access_token()
     if not access_token:
-        #print("Webhook Error: Could not obtain PayPal access token for verification.")
+        print("Webhook Error: Could not obtain PayPal access token for verification.")
         return JsonResponse({'error': 'Internal server error (token generation failed)'}, status=500)
 
     verify_url = f"{settings.PAYPAL_API_BASE_URL}/v1/notifications/verify-webhook-signature"
@@ -256,18 +256,18 @@ def paypal_webhook_view(request):
         verification_result = verify_response.json()
 
         if verification_result.get("verification_status") != "SUCCESS":
-            #print(f"Webhook verification failed: {verification_result}")
+            print(f"Webhook verification failed: {verification_result}")
             return JsonResponse({'error': 'Invalid webhook signature', 'details': verification_result}, status=403) # Forbidden
 
     except requests.exceptions.HTTPError as e:
-        #print(f"HTTPError during PayPal API call for webhook verification: {e}")
-        #print(f"Response content: {e.response.content if e.response else 'No response'}")
+        print(f"HTTPError during PayPal API call for webhook verification: {e}")
+        print(f"Response content: {e.response.content if e.response else 'No response'}")
         return JsonResponse({'error': f'PayPal API communication error: {e}'}, status=502) # Bad Gateway
     except requests.exceptions.RequestException as e:
-        #print(f"RequestException during PayPal API call for webhook verification: {e}")
+        print(f"RequestException during PayPal API call for webhook verification: {e}")
         return JsonResponse({'error': f'Network error during PayPal API communication: {e}'}, status=503) # Service Unavailable
     except Exception as e:
-        #print("Unexpected error during webhook verification process:") # Logs full traceback
+        print("Unexpected error during webhook verification process:") # Logs full traceback
         return JsonResponse({'error': 'Internal server error during signature verification'}, status=500)
 
     #print("Webhook signature verified successfully.")
@@ -277,7 +277,7 @@ def paypal_webhook_view(request):
     # The event body is already parsed in webhook_event_json
     event_type = webhook_event_json.get("event_type")
     resource = webhook_event_json.get("resource", {})
-    #print(f"Processing event type: {event_type} for resource ID (if any): {resource.get('id') or resource.get('billing_agreement_id')}")
+    print(f"Processing event type: {event_type} for resource ID (if any): {resource.get('id') or resource.get('billing_agreement_id')}")
 
     # --- Step 3: Handle specific event types ---
     try:
@@ -285,10 +285,10 @@ def paypal_webhook_view(request):
             subscription_id = resource.get("id")
             if subscription_id:
                 Subscription.objects.filter(paypal_subscription_id=subscription_id).update(status="CANCELLED")
-                #print(f"Subscription {subscription_id} status updated to CANCELLED.")
+                print(f"Subscription {subscription_id} status updated to CANCELLED.")
             else:
-                pass
-                #print(f"Event {event_type} missing resource.id.")
+                #pass
+                print(f"Event {event_type} missing resource.id.")
 
         elif event_type == "BILLING.SUBSCRIPTION.ACTIVATED":
             subscription_id = resource.get("id")
