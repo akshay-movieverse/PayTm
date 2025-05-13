@@ -145,6 +145,7 @@ STATICFILES_DIRS = [
 
 STATIC_ROOT = os.path.join(BASE_DIR,'staticfiles')
 
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.0/ref/settings/#default-auto-field
 
@@ -156,6 +157,10 @@ PAYPAL_MODE = os.getenv('PAYPAL_MODE', 'sandbox') # 'sandbox' or 'live'
 PAYPAL_CLIENT_ID = os.getenv('PAYPAL_CLIENT_ID')
 PAYPAL_CLIENT_SECRET = os.getenv('PAYPAL_CLIENT_SECRET')
 PAYPAL_PLAN_ID = os.getenv('PAYPAL_PLAN_ID') # Your specific plan ID from PayPal dashboard
+PAYPAL_PLAN_ID_BASIC = os.getenv('PAYPAL_PLAN_ID_BASIC')   # e.g., P-BASICPLANID123
+PAYPAL_PLAN_ID_STANDARD = os.getenv('PAYPAL_PLAN_ID_STANDARD') # e.g., P-STANDARDPLANID456
+PAYPAL_PLAN_ID_PREMIUM = os.getenv('PAYPAL_PLAN_ID_PREMIUM')  # e.g., P-PREMIUMPLANID789
+
 
 import paypalrestsdk
 

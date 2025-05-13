@@ -44,13 +44,13 @@ def subscribe_view(request):
     #plan_ids = get_or_create_billing_plans()  # returns a dict like {'basic': '...', 'pro': '...', 'unlimited': '...'}
     
     # Check if user has an active subscription
-    active_subscription = Subscription.objects.filter(user=user, status='active').first()
+    active_subscription = Subscription.objects.filter(user=user, status='ACTIVE').first()
 
     context = {
         'active_subscription': active_subscription,
-        'basic_plan_id': settings.PAYPAL_PLAN_ID,#plan_ids['basic'],
-        'pro_plan_id': settings.PAYPAL_PLAN_ID,#plan_ids['pro'],
-        'unlimited_plan_id': settings.PAYPAL_PLAN_ID,#plan_ids['unlimited'],
+        'basic_plan_id': settings.PAYPAL_PLAN_ID_BASIC,#plan_ids['basic'],
+        'pro_plan_id': settings.PAYPAL_PLAN_ID_STANDARD,#plan_ids['pro'],
+        'unlimited_plan_id': settings.PAYPAL_PLAN_ID_PREMIUM,#plan_ids['unlimited'],
         'paypal_client_id': settings.PAYPAL_CLIENT_ID,
     }
     # context = {
