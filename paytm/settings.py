@@ -163,6 +163,12 @@ PAYPAL_PLAN_ID_STANDARD = os.getenv('PAYPAL_PLAN_ID_STANDARD') # e.g., P-STANDAR
 PAYPAL_PLAN_ID_PREMIUM = os.getenv('PAYPAL_PLAN_ID_PREMIUM')  # e.g., P-PREMIUMPLANID789
 PAYPAL_WEBHOOK_ID = os.getenv('PAYPAL_WEBHOOK_ID')
 
+
+if PAYPAL_MODE == 'sandbox':
+    PAYPAL_API_BASE_URL = "https://api-m.sandbox.paypal.com"
+else:
+    PAYPAL_API_BASE_URL = "https://api-m.paypal.com"
+
 import paypalrestsdk
 
 paypalrestsdk.configure({
