@@ -90,17 +90,27 @@ document.addEventListener('DOMContentLoaded', function() {
         choosePlanBtns.forEach(btn => {
             btn.addEventListener('click', function() {
                 const planName = this.closest('.pricing-card').querySelector('h3').textContent;
-                console.log(`Switching to ${planName}`);
-                // This would handle plan switching in a real implementation
                 
+                const selectedPlanId = this.getAttribute('data-plan-id');
 
+                if (!selectedPlanId) {
+                    alert('Error: Could not determine the selected plan.');
+                    return;
+                }
 
-            console.log(`${currentSubscriptionId} You're about to change your current plan. Continue?",${selectedPlanId}, ${currentPlanId}`);
-            selectedPlanId = this.getAttribute('data-plan-id');
+                console.log(`Selected Plan: ${planName} (ID: ${selectedPlanId})`);
+                console.log(`Current Subscription ID: ${currentSubscriptionId}, Current Plan ID: ${currentPlanId}`);
+
 
             // If user already has a subscription, update it
-            if (currentSubscriptionId  && selectedPlanId !== currentPlanId) {
-                if (!confirm("You're about to change your current plan. Continue?")) return;
+            if (currentSubscriptionId && currentSubscriptionId !== 'None' && currentSubscriptionId !== null && selectedPlanId !== currentPlanId) {
+                    if (!confirm(`You're about to change your current plan to ${planName}. This change will typically take effect on your next billing cycle. Continue?`)) {
+                        return;
+                    }
+
+                                        // Show loading indicator
+                    // document.getElementById('loading-indicator').style.display = 'block';
+
 
                 fetch(updateUrl, {
                     method: 'POST',
@@ -109,55 +119,84 @@ document.addEventListener('DOMContentLoaded', function() {
                         'X-CSRFToken': csrfToken
                     },
                     body: JSON.stringify({
-                        subscription_id: currentSubscriptionId,
-                        new_plan_id: selectedPlanId
+                            current_paypal_subscription_id: currentSubscriptionId,
+                            new_paypal_plan_id: selectedPlanId
                     })
-                }).then(response => response.json())
-                  .then(result => {
-                      if (result.success) {
-                          alert("Plan changed successfully!");
-                          window.location.reload();
-                      } else {
-                          alert("Failed to change plan: " + result.error);
-                      }
-                  });
-                return;
-            }
-
-            // Else, render PayPal button for new subscription            
-            document.getElementById('paypal-button-container').innerHTML = '';
-            paypal.Buttons({
-                createSubscription: function (data, actions) {
-                    return actions.subscription.create({
-                        plan_id: selectedPlanId
+                })                    .then(response => {
+                        // Hide loading indicator
+                        // document.getElementById('loading-indicator').style.display = 'none';
+                        if (!response.ok) {
+                             // Try to parse error from JSON response
+                            return response.json().then(errData => {
+                                throw new Error(errData.error || `Server error: ${response.status}`);
+                            }).catch(() => {
+                                // Fallback if response isn't JSON
+                                throw new Error(`Failed to change plan. Server responded with ${response.status}`);
+                            });
+                        }
+                        return response.json();
+                    })
+                    .then(result => {
+                        if (result.success) {
+                            alert("Plan change request submitted successfully! The change will reflect on your next billing cycle.");
+                            window.location.reload();
+                        } else {
+                            alert("Failed to change plan: " + (result.error || "Unknown server error."));
+                        }
+                    })
+                    .catch(error => {
+                        // Hide loading indicator
+                        // document.getElementById('loading-indicator').style.display = 'none';
+                        console.error('Error changing plan:', error);
+                        alert('An error occurred while changing your plan: ' + error.message);
                     });
-                },
-                onApprove: function (data) {
-                    fetch(saveUrl, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'X-CSRFToken': csrfToken
+
+                } else if (!currentSubscriptionId || currentSubscriptionId === 'None' || currentSubscriptionId === null) {
+                    // Else, if no current subscription, render PayPal button for new subscription
+                    console.log('No active subscription. Rendering PayPal button for new subscription with plan ID:', selectedPlanId);
+                    document.getElementById('paypal-button-container').innerHTML = ''; // Clear previous button
+                    paypal.Buttons({
+                        createSubscription: function (data, actions) {
+                            return actions.subscription.create({
+                                plan_id: selectedPlanId
+                                // You can add 'custom_id': '{{ request.user.id }}' here if user is logged in
+                                // and your save_subscription_view is prepared to handle it for user linking,
+                                // especially if webhook might create the record.
+                            });
                         },
-                        body: JSON.stringify({
-                            subscriptionID: data.subscriptionID,
-                            planID: selectedPlanId
-                        })
-                    }).then(response => response.json())
-                      .then(result => {
-                          if (result.success) {
-                              window.location.reload();
-                          } else {
-                              alert('Subscription failed: ' + result.error);
-                          }
-                      });
+
+                        onApprove: function (data) {
+                            fetch(saveUrl, {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                    'X-CSRFToken': csrfToken
+                                },
+                                body: JSON.stringify({
+                                    subscriptionID: data.subscriptionID,
+                                    planID: selectedPlanId // send the selected planID
+                                })
+                            }).then(response => response.json())
+                              .then(result => {
+                                  if (result.success) {
+                                      alert('Subscription created successfully!');
+                                      window.location.reload();
+                                  } else {
+                                      alert('New subscription failed: ' + (result.error || "Unknown server error."));
+                                  }
+                              }).catch(error => {
+                                  console.error('Error saving new subscription:', error);
+                                  alert('Error saving new subscription.');
+                              });
+                        },
+                        onError: function(err) {
+                            console.error('PayPal Buttons error:', err);
+                            alert('An error occurred with PayPal. Please try again.');
+                        }
+                    }).render('#paypal-button-container');
+                } else if (selectedPlanId === currentPlanId) {
+                    alert("You are already subscribed to this plan.");
                 }
-            }).render('#paypal-button-container');
-
-
-
-                // Show a confirmation message
-                alert(`You have selected the ${planName}. This change will take effect on your next billing cycle.`);
             });
         });
     }

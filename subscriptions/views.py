@@ -250,52 +250,97 @@ def subscription_cancel_view(request):
 @csrf_exempt
 @login_required
 def update_subscription_plan(request):
-    import os
-    import requests
-    data = json.loads(request.body)
-    subscription_id = data.get("subscription_id")
-    new_plan_id = data.get("new_plan_id")
+    try:
+        data = json.loads(request.body.decode('utf-8'))
+        current_paypal_subscription_id = data.get('current_paypal_subscription_id')
+        new_paypal_plan_id = data.get('new_paypal_plan_id')
 
-    client_id = os.environ['PAYPAL_CLIENT_ID']
-    client_secret = os.environ['PAYPAL_CLIENT_SECRET']
+        if not current_paypal_subscription_id or not new_paypal_plan_id:
+            return JsonResponse({'success': False, 'error': 'Current Subscription ID and New Plan ID are required.'}, status=400)
 
-    auth_response = requests.post(
-        'https://api-m.sandbox.paypal.com/v1/oauth2/token',
-        auth=(client_id, client_secret),
-        headers={'Accept': 'application/json'},
-        data={'grant_type': 'client_credentials'}
-    )
-    if auth_response.status_code != 200:
-        return JsonResponse({"success": False, "error": "PayPal Auth Failed"})
+    except json.JSONDecodeError:
+        return JsonResponse({'success': False, 'error': 'Invalid JSON payload.'}, status=400)
 
-    access_token = auth_response.json()['access_token']
-
-    patch_data = [{
-        "op": "replace",
-        "path": "/plan_id",
-        "value": new_plan_id
-    }]
-
-    patch_response = requests.patch(
-        f"https://api-m.sandbox.paypal.com/v1/billing/subscriptions/{subscription_id}",
-        headers={
-            "Content-Type": "application/json",
-            "Authorization": f"Bearer {access_token}"
-        },
-        json=patch_data
-    )
-
-    if patch_response.status_code == 204:
-        # Update local DB
-        Subscription.objects.filter(paypal_subscription_id=subscription_id).update(
-            paypal_plan_id=new_plan_id
+    # Verify the subscription belongs to the current user and is active
+    try:
+        local_subscription = Subscription.objects.get(
+            paypal_subscription_id=current_paypal_subscription_id,
+            user=request.user
         )
-        return JsonResponse({"success": True})
-    else:
-        return JsonResponse({
-            "success": False,
-            "error": patch_response.json().get("message", "Unknown error")
-        })
+    except Subscription.DoesNotExist:
+        print(f"User {request.user.username} attempted to update non-existent or unauthorized subscription {current_paypal_subscription_id}.")
+        return JsonResponse({'success': False, 'error': 'Active subscription not found or unauthorized.'}, status=404)
+
+    if local_subscription.status != 'ACTIVE':
+        print(f"User {request.user.username} attempted to update non-active (status: {local_subscription.status}) subscription {current_paypal_subscription_id}.")
+        return JsonResponse({'success': False, 'error': f'Subscription is not active (current status: {local_subscription.status}). Cannot change plan.'}, status=400)
+
+    if local_subscription.paypal_plan_id == new_paypal_plan_id:
+        return JsonResponse({'success': False, 'error': 'You are already subscribed to this plan.'}, status=400)
+
+    # --- Make API Call to PayPal to Revise Subscription ---
+    access_token = get_paypal_access_token()
+    if not access_token:
+        print(f"Failed to get PayPal access token for revising subscription {current_paypal_subscription_id}.")
+        return JsonResponse({'success': False, 'error': 'Could not authenticate with PayPal. Please try again later.'}, status=500)
+
+    revise_api_url = f"{settings.PAYPAL_API_BASE_URL}/v1/billing/subscriptions/{current_paypal_subscription_id}/revise"
+    headers = {
+        "Authorization": f"Bearer {access_token}",
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+    }
+    payload = {
+        "plan_id": new_paypal_plan_id
+        # To make the change effective immediately (might involve proration setup on PayPal side):
+        # "effective_time": "IMMEDIATE",
+        # Or for next billing cycle (often default, but can be explicit):
+        # "effective_time": "NEXT_BILLING_CYCLE", 
+        # For simplicity, we rely on PayPal's default or your business logic for effective_time.
+        # If immediate change is desired, ensure your PayPal plan and account are set up for proration if applicable.
+    }
+
+    try:
+        print(f"Attempting to revise PayPal subscription {current_paypal_subscription_id} for user {request.user.username} to new plan {new_paypal_plan_id}.")
+        response = requests.post(revise_api_url, headers=headers, json=payload)
+        
+        # Successful revision usually returns 200 OK with the updated subscription details, or 204 No Content
+        if response.status_code == 200 or response.status_code == 204:
+            print(f"Successfully submitted revision for PayPal subscription {current_paypal_subscription_id} to plan {new_paypal_plan_id}.")
+            
+            # Update local subscription details
+            local_subscription.paypal_plan_id = new_paypal_plan_id
+            # The status should remain ACTIVE.
+            # The next_billing_date might change. If the response (200 OK) contains the updated subscription:
+            if response.status_code == 200:
+                try:
+                    updated_sub_details = response.json()
+                    billing_info = updated_sub_details.get("billing_info", {})
+                    next_billing_time_str = billing_info.get("next_billing_time")
+                    if next_billing_time_str:
+                        local_subscription.next_billing_date = parse_datetime(next_billing_time_str)
+                        print(f"Next billing date for {current_paypal_subscription_id} updated to {local_subscription.next_billing_date} after revision.")
+                except ValueError: # If response isn't JSON or structure is unexpected
+                    print(f"Could not parse updated subscription details from revise response for {current_paypal_subscription_id}, though revision was accepted by PayPal.")
+            
+            local_subscription.save()
+            return JsonResponse({'success': True, 'message': 'Subscription plan change initiated with PayPal.'})
+        else:
+            error_details = ""
+            try:
+                error_details = response.json()
+                print(f"PayPal API error when revising {current_paypal_subscription_id}: Status {response.status_code}, Details: {error_details}")
+            except ValueError:
+                error_details = response.text
+                print(f"PayPal API error (non-JSON) when revising {current_paypal_subscription_id}: Status {response.status_code}, Body: {error_details}")
+            return JsonResponse({'success': False, 'error': 'Failed to change plan with PayPal.', 'details': error_details}, status=response.status_code if response.status_code >=400 else 500)
+
+    except requests.exceptions.RequestException as e:
+        print(f"Network error while trying to revise PayPal subscription {current_paypal_subscription_id}:")
+        return JsonResponse({'success': False, 'error': 'A network error occurred. Please try again.'}, status=503)
+    except Exception as e:
+        print(f"Unexpected error during PayPal subscription revision for {current_paypal_subscription_id}:")
+        return JsonResponse({'success': False, 'error': 'An unexpected error occurred.'}, status=500)
 
 
 # --- Webhook Handler ---
@@ -471,7 +516,37 @@ def paypal_webhook_view(request):
         # BILLING.SUBSCRIPTION.PAYMENT.FAILED
         # BILLING.SUBSCRIPTION.UPDATED
         # ... etc.
+        elif event_type == "BILLING.SUBSCRIPTION.UPDATED":
+            subscription_id = resource.get("id")
+            if subscription_id:
+                try:
+                    subscription_obj = Subscription.objects.get(paypal_subscription_id=subscription_id)
 
+                    # Update plan ID, status, and billing dates from the webhook resource
+                    new_plan_id = resource.get("plan_id")
+                    if new_plan_id:
+                        subscription_obj.paypal_plan_id = new_plan_id
+                    
+                    new_status = resource.get("status")
+                    if new_status and new_status in [choice[0] for choice in Subscription.STATUS_CHOICES]:
+                        subscription_obj.status = new_status
+                    
+                    start_time_str = resource.get("start_time") # Less likely to change here, but good to sync
+                    if start_time_str:
+                        subscription_obj.start_date = parse_datetime(start_time_str)
+
+                    billing_info = resource.get("billing_info", {})
+                    next_billing_time_str = billing_info.get("next_billing_time")
+                    if next_billing_time_str:
+                        subscription_obj.next_billing_date = parse_datetime(next_billing_time_str)
+                    
+                    subscription_obj.save()
+                    print(f"Subscription {subscription_id} updated by UPDATED webhook. Plan: {subscription_obj.paypal_plan_id}, Status: {subscription_obj.status}, Next Billing: {subscription_obj.next_billing_date}")
+
+                except Subscription.DoesNotExist:
+                    print(f"Subscription {subscription_id} not found during UPDATED event.")
+            else:
+                print(f"Event {event_type} missing resource.id.")
         else:
             #pass
             print(f"Received unhandled event type: {event_type}")
