@@ -305,24 +305,24 @@ def paypal_webhook_view(request):
                     }
                 )
                 if created:
-                    pass
-                     #print(f"Subscription {subscription_id} was newly created by ACTIVATED webhook. Status set to ACTIVE. User association might be needed.")
+                    #pass
+                    print(f"Subscription {subscription_id} was newly created by ACTIVATED webhook. Status set to ACTIVE. User association might be needed.")
                 else:
-                    pass
-                    #print(f"Subscription {subscription_id} status updated to ACTIVE.")
+                    #pass
+                    print(f"Subscription {subscription_id} status updated to ACTIVE.")
             else:
-                pass
-                #print(f"Event {event_type} missing resource.id.")
+                #pass
+                print(f"Event {event_type} missing resource.id.")
 
 
         elif event_type == "BILLING.SUBSCRIPTION.SUSPENDED":
             subscription_id = resource.get("id")
             if subscription_id:
                 Subscription.objects.filter(paypal_subscription_id=subscription_id).update(status="SUSPENDED")
-                #print(f"Subscription {subscription_id} status updated to SUSPENDED.")
+                print(f"Subscription {subscription_id} status updated to SUSPENDED.")
             else:
-                pass
-                #print(f"Event {event_type} missing resource.id.")
+                #pass
+                print(f"Event {event_type} missing resource.id.")
 
 
         elif event_type == "PAYMENT.SALE.COMPLETED":
@@ -331,11 +331,11 @@ def paypal_webhook_view(request):
             if subscription_id:
                 # This payment confirms the subscription is active and paid for this cycle
                 Subscription.objects.filter(paypal_subscription_id=subscription_id).update(status="ACTIVE")
-                #print(f"Payment completed for subscription {subscription_id}. Status ensured/updated to ACTIVE.")
+                print(f"Payment completed for subscription {subscription_id}. Status ensured/updated to ACTIVE.")
                 # You might also want to update a `last_payment_date` or `next_billing_date` if you track those
             else:
-                pass
-                #print(f"Event {event_type} missing resource.billing_agreement_id.")
+                #pass
+                print(f"Event {event_type} missing resource.billing_agreement_id.")
         
         # Add handlers for other events like:
         # BILLING.SUBSCRIPTION.EXPIRED
@@ -344,11 +344,11 @@ def paypal_webhook_view(request):
         # ... etc.
 
         else:
-            pass
-            #print(f"Received unhandled event type: {event_type}")
+            #pass
+            print(f"Received unhandled event type: {event_type}")
 
     except Exception as e:
-        #print(f"Error processing webhook event {event_type}:") # Logs full traceback
+        print(f"Error processing webhook event {event_type}:") # Logs full traceback
         # Return 200 still, as PayPal doesn't care about your processing errors, only that you received it.
         # However, you need to monitor these logs.
         return HttpResponse("Webhook received, but internal processing error occurred.", status=200)
