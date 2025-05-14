@@ -122,6 +122,7 @@
     const csrfToken = '{{ csrf_token }}';
     const currentSubscriptionId = '{{ active_subscription.paypal_subscription_id|default:"" }}';
     const currentPlanId = '{{ active_subscription.paypal_plan_id|default:"" }}';
+    const cancelURL = "{% url 'subscription_cancel' %}"
 </script>
 
 {% endblock %}

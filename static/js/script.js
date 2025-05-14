@@ -42,7 +42,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
                 // This would handle the PayPal cancellation in a real implementation #ak47
                 
-                fetch("{% url 'subscription_cancel' %}", {
+                fetch(cancelURL, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json', // Sending JSON
