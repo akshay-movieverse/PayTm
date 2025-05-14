@@ -1,6 +1,9 @@
 from django.shortcuts import render
 from django.contrib.auth.decorators import login_required
 import requests
+from django.utils.dateparse import parse_datetime
+
+
 
 
 # Create your views here.
@@ -45,9 +48,31 @@ def subscribe_view(request):
     #plan_ids = get_or_create_billing_plans()  # returns a dict like {'basic': '...', 'pro': '...', 'unlimited': '...'}
     
     # Check if user has an active subscription
-    active_subscription = Subscription.objects.filter(user=user, status='ACTIVE').first()
-
+    plan_name = 'No Active Subscription'
+    plan_price="$0"
+    plan_credits = "0"
+    active_subscription = Subscription.objects.filter(user=user).first() #, status='ACTIVE'
+    if active_subscription:
+        if settings.PAYPAL_PLAN_ID_BASIC == active_subscription.paypal_plan_id:
+            plan_name= 'Basic Plan'
+            plan_price= '$5/mo'
+            plan_credits = "50/mo"
+        elif settings.PAYPAL_PLAN_ID_STANDARD == active_subscription.paypal_plan_id:
+            plan_name= 'Pro Plan'
+            plan_price= '$10/mo'
+            plan_credits = "100/mo"
+        elif settings.PAYPAL_PLAN_ID_PREMIUM == active_subscription.paypal_plan_id:
+            plan_name= 'Unlimited Plan'
+            plan_price= '$20/mo'
+            plan_credits = "Unlimited"
+        else:
+            plan_name= 'Unknown'
+            plan_price="$0"
+            plan_credits = "0"
     context = {
+        'plan_name': plan_name,
+        'plan_price': plan_price,
+        'plan_credits': plan_credits,
         'active_subscription': active_subscription,
         'basic_plan_id': settings.PAYPAL_PLAN_ID_BASIC,#plan_ids['basic'],
         'pro_plan_id': settings.PAYPAL_PLAN_ID_STANDARD,#plan_ids['pro'],
@@ -79,6 +104,7 @@ def save_subscription_view(request):
         # Optional: Verify subscription details with PayPal API (recommended)
         # try:
         #     sub = paypalrestsdk.Subscription.find(paypal_subscription_id)
+        #     print("sub>>>>>>>>>>>>>>>>>>>>",sub)
         #     if not sub or sub.plan_id != paypal_plan_id: # Basic validation
         #          raise ValueError("Subscription details mismatch or not found")
         #     paypal_status = sub.status # e.g., 'ACTIVE'
@@ -100,6 +126,8 @@ def save_subscription_view(request):
             defaults={
                 'paypal_subscription_id': paypal_subscription_id,
                 'status': 'PENDING', # Initially set to PENDING or ACTIVE if verified
+                    # 'start_date': sub.start_time,
+                    # 'next_billing_date': sub.billing_info.next_billing_time,
                 # 'status': paypal_status if verified, else 'PENDING',
             }
         )
@@ -134,14 +162,89 @@ def subscription_success_view(request):
 @login_required
 @require_GET
 def subscription_cancel_view(request):
-    """Page shown if the user cancels the PayPal flow."""
-    #return render(request, 'subscriptions/subscription_cancel.html')
+    try:
+        data = json.loads(request.body.decode('utf-8'))
+        paypal_subscription_id_to_cancel = data.get('paypal_subscription_id')
+        reason = data.get('reason', 'User requested cancellation.') # Optional reason
 
-    sub = Subscription.objects.filter(user=request.user, status='ACTIVE').first()
-    if sub:
-        sub.status = 'CANCELLED'
-        sub.save()
-    return JsonResponse({"success": True})
+        if not paypal_subscription_id_to_cancel:
+            return JsonResponse({'success': False, 'error': 'PayPal Subscription ID is required.'}, status=400)
+
+    except json.JSONDecodeError:
+        return JsonResponse({'success': False, 'error': 'Invalid JSON payload.'}, status=400)
+
+    # Fetch the local subscription record and verify ownership
+    try:
+        local_subscription = Subscription.objects.get(
+            paypal_subscription_id=paypal_subscription_id_to_cancel,
+            user=request.user
+        )
+    except Subscription.DoesNotExist:
+        print(f"User {request.user.username} attempted to cancel non-existent or unauthorized subscription {paypal_subscription_id_to_cancel}.")
+        return JsonResponse({'success': False, 'error': 'Subscription not found or you do not have permission to cancel it.'}, status=404)
+
+    if local_subscription.status == 'CANCELLED':
+        print(f"Subscription {paypal_subscription_id_to_cancel} is already cancelled locally for user {request.user.username}.")
+        return JsonResponse({'success': True, 'message': 'Subscription is already cancelled.'})
+    
+    if local_subscription.status == 'EXPIRED': # Or other non-cancellable states
+        print(f"Subscription {paypal_subscription_id_to_cancel} is {local_subscription.status} and cannot be cancelled this way.")
+        return JsonResponse({'success': False, 'error': f'Subscription is already {local_subscription.status}.'})
+
+
+    # --- Make API Call to PayPal to Cancel Subscription ---
+    access_token = get_paypal_access_token()
+    if not access_token:
+        print(f"Failed to get PayPal access token for cancelling subscription {paypal_subscription_id_to_cancel}.")
+        return JsonResponse({'success': False, 'error': 'Could not authenticate with PayPal. Please try again later.'}, status=500)
+
+    cancel_api_url = f"{settings.PAYPAL_API_BASE_URL}/v1/billing/subscriptions/{paypal_subscription_id_to_cancel}/cancel"
+    headers = {
+        "Authorization": f"Bearer {access_token}",
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+        # "PayPal-Request-Id": "SOME_UNIQUE_ID_FOR_IDEMPOTENCY" # Optional
+    }
+    payload = {
+        "reason": reason
+    }
+
+    try:
+        print(f"Attempting to cancel PayPal subscription {paypal_subscription_id_to_cancel} for user {request.user.username}.")
+        response = requests.post(cancel_api_url, headers=headers, json=payload)
+
+        # PayPal returns 204 No Content on successful cancellation
+        if response.status_code == 204:
+            local_subscription.status = 'CANCELLED'
+            # Optionally, you can set other fields like a `cancelled_at` timestamp
+            # from django.utils import timezone
+            # local_subscription.cancelled_at = timezone.now()
+            local_subscription.save()
+            print(f"Successfully cancelled PayPal subscription {paypal_subscription_id_to_cancel} for user {request.user.username}. Local status updated.")
+            return JsonResponse({'success': True, 'message': 'Subscription cancelled successfully with PayPal.'})
+        else:
+            # Attempt to parse error details from PayPal
+            error_details = ""
+            try:
+                error_details = response.json()
+                print(f"PayPal API error when cancelling {paypal_subscription_id_to_cancel}: Status {response.status_code}, Details: {error_details}")
+            except ValueError: # if response is not JSON
+                error_details = response.text
+                print(f"PayPal API error (non-JSON) when cancelling {paypal_subscription_id_to_cancel}: Status {response.status_code}, Body: {error_details}")
+            
+            # Check for specific PayPal error indicating it's already cancelled or in a non-cancellable state
+            # Example: error_details.get('name') == 'RESOURCE_NOT_FOUND' or 'SUBSCRIPTION_NOT_ACTIVE'
+            # This part requires checking PayPal's specific error responses for cancellation.
+            # For now, a generic error:
+            return JsonResponse({'success': False, 'error': 'Failed to cancel subscription with PayPal.', 'details': error_details}, status=response.status_code if response.status_code >= 400 else 500)
+
+    except requests.exceptions.RequestException as e:
+        print(f"Network error while trying to cancel PayPal subscription {paypal_subscription_id_to_cancel}:")
+        return JsonResponse({'success': False, 'error': 'A network error occurred. Please try again.'}, status=503) # Service Unavailable
+    except Exception as e:
+        print(f"Unexpected error during PayPal subscription cancellation for {paypal_subscription_id_to_cancel}:")
+        return JsonResponse({'success': False, 'error': 'An unexpected error occurred.'}, status=500)
+
 
 
 @csrf_exempt
@@ -293,23 +396,49 @@ def paypal_webhook_view(request):
         elif event_type == "BILLING.SUBSCRIPTION.ACTIVATED":
             subscription_id = resource.get("id")
             if subscription_id:
-                # Update existing or create if (for some reason) it wasn't created by your save_subscription_view
-                # Usually, it should exist from the initial onApprove flow.
-                sub, created = Subscription.objects.update_or_create(
-                    paypal_subscription_id=subscription_id,
-                    defaults={
-                        'status': "ACTIVE",
-                        'paypal_plan_id': resource.get('plan_id', '') # Good to store/update plan_id
-                        # If 'created' is True, you might need to associate the user
-                        # This depends on your flow - ideally, the user is associated when record is first made.
-                    }
-                )
-                if created:
-                    #pass
-                    print(f"Subscription {subscription_id} was newly created by ACTIVATED webhook. Status set to ACTIVE. User association might be needed.")
-                else:
-                    #pass
-                    print(f"Subscription {subscription_id} status updated to ACTIVE.")
+                try:
+                    subscription_obj = Subscription.objects.get(paypal_subscription_id=subscription_id) # GET, not update_or_create
+
+                    subscription_obj.status = "ACTIVE" # Always update status
+                    start_time_str = resource.get("start_time")
+                    if start_time_str:
+                        subscription_obj.start_date = parse_datetime(start_time_str)
+
+                    billing_info = resource.get("billing_info", {})
+                    next_billing_time_str = billing_info.get("next_billing_time")
+                    if next_billing_time_str:
+                        subscription_obj.next_billing_date = parse_datetime(next_billing_time_str)
+                    
+                    # Update plan_id if it changed or wasn't set
+                    new_plan_id = resource.get('plan_id')
+                    if new_plan_id and subscription_obj.paypal_plan_id != new_plan_id:
+                        subscription_obj.paypal_plan_id = new_plan_id
+                        print(f"Plan ID for {subscription_id} updated to {new_plan_id}.")
+                        
+                    subscription_obj.save()
+                    print(f"Subscription {subscription_id} updated by ACTIVATED webhook. Status: {subscription_obj.status}, Start: {subscription_obj.start_date}, Next Billing: {subscription_obj.next_billing_date}")
+
+                except Subscription.DoesNotExist:
+                    print(f"CRITICAL: Subscription {subscription_id} not found during ACTIVATED event. It should have been created by save_subscription_view.")
+
+
+                # # Update existing or create if (for some reason) it wasn't created by your save_subscription_view
+                # # Usually, it should exist from the initial onApprove flow.
+                # sub, created = Subscription.objects.update_or_create(
+                #     paypal_subscription_id=subscription_id,
+                #     defaults={
+                #         'status': "ACTIVE",
+                #         'paypal_plan_id': resource.get('plan_id', '') # Good to store/update plan_id
+                #         # If 'created' is True, you might need to associate the user
+                #         # This depends on your flow - ideally, the user is associated when record is first made.
+                #     }
+                # )
+                # if created:
+                #     #pass
+                #     print(f"Subscription {subscription_id} was newly created by ACTIVATED webhook. Status set to ACTIVE. User association might be needed.")
+                # else:
+                #     #pass
+                #     print(f"Subscription {subscription_id} status updated to ACTIVE.")
             else:
                 #pass
                 print(f"Event {event_type} missing resource.id.")

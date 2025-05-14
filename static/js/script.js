@@ -28,26 +28,53 @@ document.addEventListener('DOMContentLoaded', function() {
     
     if (cancelBtn) {
         cancelBtn.addEventListener('click', function() {
+
+            const payPalSubscriptionId = this.dataset.subscriptionId; // Get ID from data attribute
+        
+            if (!payPalSubscriptionId) {
+                alert('Error: Subscription ID not found. Cannot cancel.');
+                return;
+            }
+
             if (confirm('Are you sure you want to cancel your subscription?')) {
-                console.log('Subscription cancellation initiated');
+                console.log('Initiating cancellation for PayPal Subscription ID:', payPalSubscriptionId);
+
 
                 // This would handle the PayPal cancellation in a real implementation #ak47
-                paypal.Subscription.cancel(subscriptionId).then(function () {
+                
                 fetch("{% url 'subscription_cancel' %}", {
                     method: 'POST',
                     headers: {
+                        'Content-Type': 'application/json', // Sending JSON
                         'X-CSRFToken': csrfToken,
-                    }
+                    },
+                    body: JSON.stringify({
+                        paypal_subscription_id: payPalSubscriptionId,
+                        reason: 'User requested cancellation via website.' // Optional reason
+                    })
                 }).then(response => {
                     if (response.ok) {
-                        window.location.reload();
+                        return response.json();
                     } else {
-                        alert("Failed to update subscription on server.");
+                    // Try to get error message from server response if JSON
+                    return response.json().then(errData => {
+                        throw new Error(errData.error || `Server error: ${response.status}`);
+                    }).catch(() => {
+                        // Fallback if response isn't JSON or doesn't have .error
+                        throw new Error(`Failed to cancel subscription. Server responded with ${response.status}`);
+                    });
+                }
+                }).then(data => {
+                    if (data.success) {
+                        alert('Subscription cancelled successfully!');
+                        window.location.reload(); // Or redirect to a confirmation page
+                    } else {
+                        alert('Failed to cancel subscription: ' + (data.error || 'Unknown error from server.'));
                     }
-                });
                 }).catch(function (err) {
-                    console.error("Cancellation failed:", err);
-                    alert("PayPal cancellation failed.");
+                    // Hide loading indicator
+                    console.error("Cancellation request failed:", err);
+                    alert("An error occurred while trying to cancel your subscription: " + err.message);
                 });
                 // This would handle the PayPal cancellation in a real implementation #ak47
 
@@ -70,7 +97,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
             console.log(`${currentSubscriptionId} You're about to change your current plan. Continue?",${selectedPlanId}, ${currentPlanId}`);
             selectedPlanId = this.getAttribute('data-plan-id');
-            
+
             // If user already has a subscription, update it
             if (currentSubscriptionId  && selectedPlanId !== currentPlanId) {
                 if (!confirm("You're about to change your current plan. Continue?")) return;

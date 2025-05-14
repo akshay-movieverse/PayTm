@@ -9,12 +9,14 @@
     <div class="active-plan-card">
         <div class="active-plan-header">
             <h2>Active Plan</h2>
+            {% if active_subscription.status == "ACTIVE" %}
             <button id="paypal-cancel-btn" class="cancel-btn" data-subscription-id="{{ active_subscription.paypal_subscription_id }}">Cancel Subscription</button>
+            {% endif %}
         </div>
         
         <div class="active-plan-content">
             <div class="plan-badge">
-                <span>Pro Plan</span>
+                <span>{{ plan_name }}</span>
             </div>
             
             <div class="plan-details">
@@ -25,12 +27,12 @@
                 
                 <div class="plan-detail">
                     <span class="detail-label">Price</span>
-                    <span class="detail-value">$10/mo</span>
+                    <span class="detail-value">{{plan_price}}</span>
                 </div>
                 
                 <div class="plan-detail">
                     <span class="detail-label">Credits</span>
-                    <span class="detail-value">100/mo</span>
+                    <span class="detail-value">{{plan_credits}}</span>
                 </div>
             </div>
             
@@ -50,7 +52,7 @@
         
         <div class="pricing-cards">
             <!-- Basic Plan -->
-            <div class="pricing-card">
+            <div class="pricing-card {% if active_subscription.paypal_plan_id == basic_plan_id %}active{% endif %}">
                 <div class="price">
                     <span class="amount">$5</span>
                     <span class="period">/month</span>
@@ -65,11 +67,11 @@
                 
 
 
-                <button class="plan-btn choose-btn" data-plan-id="{{ basic_plan_id }}">Choose Plan</button>
+                <button class="plan-btn {% if active_subscription.paypal_plan_id == basic_plan_id %}subscribed-btn{%else%}choose-btn{% endif %}" data-plan-id="{{ basic_plan_id }}">Choose Plan</button>
             </div>
             
             <!-- Pro Plan -->
-            <div class="pricing-card active">
+            <div class="pricing-card {% if active_subscription.paypal_plan_id == pro_plan_id %}active{% endif %}">
                 <div class="price">
                     <span class="amount">$10</span>
                     <span class="period">/month</span>
@@ -82,11 +84,11 @@
                     <span>100 Credits/mo</span>
                 </div>
                 
-                <button class="plan-btn subscribed-btn" data-plan-id="{{ unlimited_plan_id }}">Subscribed</button>
+                <button class="plan-btn {% if active_subscription.paypal_plan_id == pro_plan_id %}subscribed-btn{%else%}choose-btn{% endif %}" data-plan-id="{{ pro_plan_id }}">Subscribed</button>
             </div>
             
             <!-- Unlimited Plan -->
-            <div class="pricing-card">
+            <div class="pricing-card {% if active_subscription.paypal_plan_id == unlimited_plan_id %}active{% endif %}">
                 <div class="popular-badge">Most Popular</div>
                 
                 <div class="price">
@@ -101,7 +103,7 @@
                     <span>Unlimited Credits/mo</span>
                 </div>
                 
-                <button class="plan-btn choose-btn"  data-plan-id="{{ unlimited_plan_id }}">Choose Plan</button>
+                <button class="plan-btn {% if active_subscription.paypal_plan_id == unlimited_plan_id %}subscribed-btn{%else%}choose-btn{% endif %}"  data-plan-id="{{ unlimited_plan_id }}">Choose Plan</button>
             </div>
         </div>
     </div>
