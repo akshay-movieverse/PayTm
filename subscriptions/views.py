@@ -122,10 +122,11 @@ def save_subscription_view(request):
         # Create or update the subscription record in your database
         subscription, created = Subscription.objects.update_or_create(
             user=request.user,
-            paypal_plan_id=paypal_plan_id, # Store the plan ID
+             # Store the plan ID
             defaults={
                 'paypal_subscription_id': paypal_subscription_id,
                 'status': 'PENDING', # Initially set to PENDING or ACTIVE if verified
+                'paypal_plan_id':paypal_plan_id,
                     # 'start_date': sub.start_time,
                     # 'next_billing_date': sub.billing_info.next_billing_time,
                 # 'status': paypal_status if verified, else 'PENDING',
