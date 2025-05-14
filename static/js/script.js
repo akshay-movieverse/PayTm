@@ -103,7 +103,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
 
             // If user already has a subscription, update it
-            if (currentSubscriptionId && currentSubscriptionId !== 'None' && currentSubscriptionId !== null && selectedPlanId !== currentPlanId) {
+            if (planStatus=="ACTIVE" && currentSubscriptionId && currentSubscriptionId !== 'None' && currentSubscriptionId !== null && selectedPlanId !== currentPlanId) {
                     if (!confirm(`You're about to change your current plan to ${planName}. This change will typically take effect on your next billing cycle. Continue?`)) {
                         return;
                     }
@@ -151,7 +151,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         alert('An error occurred while changing your plan: ' + error.message);
                     });
 
-                } else if (!currentSubscriptionId || currentSubscriptionId === 'None' || currentSubscriptionId === null) {
+                } else if (!currentSubscriptionId || currentSubscriptionId === 'None' || currentSubscriptionId === null || planStatus=="CANCELLED") {
                     // Else, if no current subscription, render PayPal button for new subscription
                     console.log('No active subscription. Rendering PayPal button for new subscription with plan ID:', selectedPlanId);
                     document.getElementById('paypal-button-container').innerHTML = ''; // Clear previous button
@@ -194,7 +194,7 @@ document.addEventListener('DOMContentLoaded', function() {
                             alert('An error occurred with PayPal. Please try again.');
                         }
                     }).render('#paypal-button-container');
-                } else if (selectedPlanId === currentPlanId) {
+                } else if (selectedPlanId === currentPlanId && planStatus=="ACTIVE") {
                     alert("You are already subscribed to this plan.");
                 }
             });
