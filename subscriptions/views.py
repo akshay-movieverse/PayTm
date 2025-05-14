@@ -160,7 +160,7 @@ def subscription_success_view(request):
     return render(request, 'subscriptions/subscription_success.html', context)
 
 @login_required
-@require_GET
+@require_POST
 def subscription_cancel_view(request):
     try:
         data = json.loads(request.body.decode('utf-8'))
